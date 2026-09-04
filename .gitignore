@@ -1,0 +1,38 @@
+# Build output (see Makefile: BUILD_DIR / BIN_DIR)
+/build/
+/bin/
+
+# Object, dependency, and library files
+*.o
+*.obj
+*.d
+*.a
+*.so
+*.so.*
+*.dylib
+*.dll
+*.lib
+*.exe
+
+# Debug info / profiling
+*.dSYM/
+*.su
+*.gcno
+*.gcda
+*.gcov
+perf.data*
+core
+vgcore.*
+
+# Packet captures
+*.pcap
+*.pcapng
+*.cap
+
+# Editor / tooling
+.vscode/
+.idea/
+*.swp
+*~
+compile_commands.json
+.cache/
