@@ -1,5 +1,7 @@
 #include "ui/DeviceSelect.h"
+
 #include "stdftxui.h"
+#include "Defines.h"
 
 #include <vector>
 #include <string>
@@ -11,8 +13,11 @@ using namespace ftxui;
 constexpr int NAME_COLUMN_WIDTH {24};
 
 void DeviceSelectScreen::Render() {
+  FILE_TRACE_LOG("DeviceSelect:: Rendering Device Select Screen.");
+
   if(m_ActiveDeviceSelects.empty()) {
     m_SelectedDevice = std::nullopt;
+    FILE_TRACE_LOG("DeviceSelect:: Device selection is empty!");
     return;
   }
 
@@ -74,6 +79,7 @@ void DeviceSelectScreen::Render() {
   renderer |= CatchEvent([&](Event event) {
     if(event == Event::Character('q') || event == Event::Escape) {
       screen.Exit();
+      FILE_TRACE_LOG("DeviceSelect:: Quitting.");
       return true;
     }
     return false;
@@ -83,8 +89,10 @@ void DeviceSelectScreen::Render() {
   screen.Loop(renderer);
 
   if(!confirmed) {
+    FILE_TRACE_LOG("DeviceSelect::Not confirmed.");
     m_SelectedDevice = std::nullopt;
     return;
   }
   m_SelectedDevice = m_ActiveDeviceSelects.at(static_cast<std::size_t>(selected));
+  FILE_TRACE_LOG("DeviceSelect:: Selection Complete.");
 }

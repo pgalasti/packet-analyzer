@@ -1,4 +1,5 @@
 #include "stdftxui.h"
+#include "Defines.h"
 
 #include "core/Device.h"
 #include "ui/DeviceSelect.h"
@@ -16,12 +17,16 @@ void packetCallback(u_char* args, const struct pcap_pkthdr* pHeader, const u_cha
 
 int main([[maybe_unused]]int argc, [[maybe_unused]]char* argv[]) {
 
+  FILE_TRACE_LOG("Starting up...");
+
   const auto devices {PA::Core::ListDevices()};
   const PA::UI::ActiveDeviceSelects deviceSelections { devices 
     | std::views::transform([](const PA::Core::Device& device) { 
         return PA::UI::ActiveDeviceSelect{device.DeviceName, device.Description}; 
       })
     | std::ranges::to<PA::UI::ActiveDeviceSelects>() };
+  FILE_TRACE_LOG("Devices Fetched:");
+  FILE_TRACE_LOG(devices.size());
 
   PA::UI::DeviceSelectScreen deviceSelectScreen(deviceSelections);
   deviceSelectScreen.Render();
