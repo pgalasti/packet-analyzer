@@ -3,6 +3,7 @@
 #include <string>
 #include <cstring>
 #include <stdexcept>
+#include <iomanip>
 
 #include <pcap.h>
 
@@ -10,17 +11,21 @@ constexpr int LOOKUP_OP_FAILURE {-1};
 
 struct ActiveDevice {
   std::string DeviceName;
+  std::string Description;
   std::string ReadableAddress;
 };
 
 std::vector<ActiveDevice> ListDevices(); 
 
-int main(int argc, char* argv[]) {
+int main([[maybe_unused]]int argc, [[maybe_unused]]char* argv[]) {
 
   auto devices {ListDevices()};
 
   for(auto device : devices) {
-    std::cout << device.DeviceName << std::endl;
+    std::cout << std::left << std::setw(20) 
+      << device.DeviceName << std::setw(10)
+      << " - " << std::left << std::setw(30) 
+      << device.Description << std::endl;
   }
 
   return 0;
@@ -39,11 +44,24 @@ std::vector<ActiveDevice> ListDevices() {
     throw std::runtime_error("Unable to determine network devices!");
   }
  
-  auto GetDeviceDetails = [](pcap_if_t* pAllDevs) -> ActiveDevice {
-    char szDeviceName[128];
-    strncpy(szDeviceName, pAllDevs->name, 127);
-    szDeviceName[127] = '\0';
-    return {std::string(szDeviceName), ""};
+  auto GetDeviceDetails = [](pcap_if_t* pDev) -> ActiveDevice {
+    char szBuffer[128];
+    strncpy(szBuffer, pDev->name, 127);
+    szBuffer[127] = '\0';
+    std::string deviceName {szBuffer};
+
+    std::string description;
+    if(pDev->description) {
+      strncpy(szBuffer, pDev->description, 127);
+      szBuffer[127] = '\0';
+      description = szBuffer;
+    }
+
+    
+    return {deviceName, 
+	    description.empty() ? "No Description Available" : description, 
+	    ""
+    };
   };
 
   for(auto pDev{pAllDevs}; pDev != nullptr; pDev = pDev->next) {

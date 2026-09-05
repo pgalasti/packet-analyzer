@@ -4,7 +4,7 @@ BUILD_DIR := build
 BIN_DIR   := bin
 
 CXX      ?= g++
-CXXSTD   := -std=c++17
+CXXSTD   := -std=c++23
 WARNINGS := -Wall -Wextra -Wpedantic
 CPPFLAGS += -I$(SRC_DIR) -MMD -MP
 CXXFLAGS += $(CXXSTD) $(WARNINGS)
