@@ -8,8 +8,6 @@
 #include <ranges>
 #include <algorithm>
 
-#include <pcap.h>
-
 using namespace ftxui;
 
 int main([[maybe_unused]]int argc, [[maybe_unused]]char* argv[]) {
