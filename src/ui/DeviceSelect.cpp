@@ -11,15 +11,15 @@ using namespace ftxui;
 constexpr int NAME_COLUMN_WIDTH {24};
 
 void DeviceSelectScreen::Render() {
-  if(m_ActiveDevices.empty()) {
+  if(m_ActiveDeviceSelects.empty()) {
     m_SelectedDevice = std::nullopt;
     return;
   }
 
   std::vector<std::string> deviceNames;
   std::unordered_map<std::string, std::string> descriptions;
-  deviceNames.reserve(m_ActiveDevices.size());
-  for(const auto& device : m_ActiveDevices) {
+  deviceNames.reserve(m_ActiveDeviceSelects.size());
+  for(const auto& device : m_ActiveDeviceSelects) {
     deviceNames.push_back(device.DeviceName);
     descriptions.emplace(device.DeviceName, device.Description);
   }
@@ -86,5 +86,5 @@ void DeviceSelectScreen::Render() {
     m_SelectedDevice = std::nullopt;
     return;
   }
-  m_SelectedDevice = m_ActiveDevices.at(static_cast<std::size_t>(selected));
+  m_SelectedDevice = m_ActiveDeviceSelects.at(static_cast<std::size_t>(selected));
 }

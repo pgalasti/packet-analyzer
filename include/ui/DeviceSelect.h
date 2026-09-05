@@ -9,21 +9,20 @@
 
 namespace PA::UI {
 
-struct ActiveDevice {
+struct ActiveDeviceSelect {
   std::string DeviceName;
   std::string Description;
-  std::string ReadableAddress;
 };
 
-using ActiveDevices = std::vector<ActiveDevice>; 
-using SelectedDevice = std::optional<ActiveDevice>;
+using ActiveDeviceSelects = std::vector<ActiveDeviceSelect>; 
+using SelectedDevice = std::optional<ActiveDeviceSelect>;
 
-using Base = Screen<ActiveDevices, SelectedDevice>;
+using Base = Screen<ActiveDeviceSelects, SelectedDevice>;
 
-class DeviceSelectScreen : public Screen<ActiveDevices, SelectedDevice> {
+class DeviceSelectScreen : public Screen<ActiveDeviceSelects, SelectedDevice> {
 public:
-  DeviceSelectScreen(const ActiveDevices& activeDevices)
-    : Base(activeDevices), m_ActiveDevices{activeDevices} {}
+  DeviceSelectScreen(const ActiveDeviceSelects& activeDevices)
+    : Base(activeDevices), m_ActiveDeviceSelects{activeDevices} {}
   ~DeviceSelectScreen() = default;
 
   void Render() override;
@@ -35,7 +34,7 @@ public:
 
 
 private:
-  ActiveDevices m_ActiveDevices;
+  ActiveDeviceSelects m_ActiveDeviceSelects;
   SelectedDevice m_SelectedDevice;
 
 };
