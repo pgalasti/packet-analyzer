@@ -1,9 +1,16 @@
 # packet-analyzer
 
+A console based packet analyzer.
+
+1. Pick your interface device
+2. Watch the packets roll in
+3. ???
+4. Profit
+
 ## Build
 
 ### Prereqs
-I'm trying out [FTXUI](https://github.com/ArthurSonzogni/FTXUI) for some cool UI and libpcap for network capture.
+I'm trying out [FTXUI](https://github.com/ArthurSonzogni/FTXUI) for some cool UI stuff and libpcap for network capture.
 
 ```bash
 # Debian apt
