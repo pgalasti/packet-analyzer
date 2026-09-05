@@ -3,15 +3,15 @@
 #include <string>
 #include <cstring>
 #include <stdexcept>
-#include <iomanip>
-#include <algorithm>
+#include <optional>
+#include <unordered_map>
 
 #include <pcap.h>
 
 #include "stdftxui.h"
-#include <ftxui/screen/terminal.hpp>
 
 constexpr int LOOKUP_OP_FAILURE {-1};
+constexpr int NAME_COLUMN_WIDTH {24};
 
 struct ActiveDevice {
   std::string DeviceName;
@@ -19,8 +19,8 @@ struct ActiveDevice {
   std::string ReadableAddress;
 };
 
-std::vector<ActiveDevice> ListDevices(); 
-ftxui::Element GenerateUIElements(const std::vector<ActiveDevice>&);
+std::vector<ActiveDevice> ListDevices();
+std::optional<ActiveDevice> SelectDevice(const std::vector<ActiveDevice>&);
 
 
 using namespace ftxui;
@@ -28,15 +28,14 @@ using namespace ftxui;
 int main([[maybe_unused]]int argc, [[maybe_unused]]char* argv[]) {
 
   auto devices {ListDevices()};
-  
-  auto document = GenerateUIElements(devices);
 
-  document->ComputeRequirement();
-  const auto required = document->requirement();
-  auto screen = Screen(std::max(required.min_x, Terminal::Size().dimx),
-                       required.min_y);
-  Render(screen, document);
-  screen.Print();
+  auto selection {SelectDevice(devices)};
+  if(!selection) {
+    std::cout << "No device selected.\n";
+    return 1;
+  }
+
+  std::cout << "Capturing on: " << selection->DeviceName << '\n';
 
   return 0;
 
@@ -66,7 +65,6 @@ std::vector<ActiveDevice> ListDevices() {
       szBuffer[127] = '\0';
       description = szBuffer;
     }
-
     
     return {deviceName, 
 	    description.empty() ? "No Description Available" : description, 
@@ -78,26 +76,84 @@ std::vector<ActiveDevice> ListDevices() {
     devices.push_back(GetDeviceDetails(pDev));
   }
 
+  pcap_freealldevs(pAllDevs);
+
   return devices; 
 }
 
-ftxui::Element GenerateUIElements(const std::vector<ActiveDevice>& devices) {
-  std::vector<Element> deviceRows;
-  deviceRows.reserve(devices.size());
+std::optional<ActiveDevice> SelectDevice(const std::vector<ActiveDevice>& devices) {
+  if(devices.empty()) {
+    return std::nullopt;
+  }
 
-  std::transform(devices.begin(), devices.end(), std::back_inserter(deviceRows),
-		[](const ActiveDevice& device) {
-                  return hbox({
-                    text(device.DeviceName) | border | color(Color::Green) | size(WIDTH, EQUAL, 30),
-		    text(device.Description) | border | flex
-		  });
-		});
-  return vbox({
-    hbox({
-      text("Device Interface") | border | color(Color::Green) | bold | size(WIDTH, EQUAL, 30),
-      text("Description") | border | color(Color::CyanLight) | bold | flex,
-    }),
-    vbox(std::move(deviceRows))
+  std::vector<std::string> deviceNames;
+  std::unordered_map<std::string, std::string> descriptions;
+  deviceNames.reserve(devices.size());
+  for(const auto& device : devices) {
+    deviceNames.push_back(device.DeviceName);
+    descriptions.emplace(device.DeviceName, device.Description);
+  }
+
+  int selected {0};
+  bool confirmed {false};
+
+  auto screen {ScreenInteractive::Fullscreen()};
+
+  auto menuOption {MenuOption::Vertical()};
+  menuOption.entries = &deviceNames;
+  menuOption.selected = &selected;
+  menuOption.on_enter = [&] {
+    confirmed = true;
+    screen.Exit();
+  };
+  menuOption.entries_option.transform = [&descriptions](const EntryState& state) {
+    auto row = hbox({
+      text(state.active ? " > " : "   "),
+      text(state.label) | size(WIDTH, EQUAL, NAME_COLUMN_WIDTH),
+      text(descriptions.at(state.label)) | flex,
+    });
+
+    if(state.active) {
+      return row | bold | color(Color::Black) | bgcolor(Color::Green);
+    }
+    return row | color(Color::GrayLight);
+  };
+
+  auto menu = Menu(menuOption);
+
+  auto renderer = Renderer(menu, [&] {
+    return vbox({
+      text(" Select a capture interface ") | bold | color(Color::Green),
+      separator(),
+      hbox({
+        text("   "),
+        text("INTERFACE") | size(WIDTH, EQUAL, NAME_COLUMN_WIDTH),
+        text("DESCRIPTION") | flex,
+      }) | bold | color(Color::CyanLight),
+      separator(),
+      menu->Render() | vscroll_indicator | yframe | flex,
+      separator(),
+      hbox({
+        text(" up/down ") | bold, text("move   "),
+        text("enter ") | bold, text("select   "),
+        text("q ") | bold, text("quit"),
+      }) | color(Color::GrayDark),
+    }) | border | color(Color::Green);
   });
-}
 
+  renderer |= CatchEvent([&](Event event) {
+    if(event == Event::Character('q') || event == Event::Escape) {
+      screen.Exit();
+      return true;
+    }
+    return false;
+  });
+
+  screen.Clear();
+  screen.Loop(renderer);
+
+  if(!confirmed) {
+    return std::nullopt;
+  }
+  return devices.at(static_cast<std::size_t>(selected));
+}
