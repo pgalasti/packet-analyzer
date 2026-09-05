@@ -3,9 +3,10 @@
 
 namespace PA::UI {
 
+template <typename ScreenData, typename ScreenResult>
 class Screen {
 public:
-  Screen() = default;
+  Screen(const ScreenData&){};
   virtual ~Screen() = default;
   
   // The intent is to wrap up the logic for the particular screen logic
@@ -18,8 +19,7 @@ public:
   // The intent is any clean up needed before destruction
   virtual void Cleanup() = 0;
 
-protected:
-  Screen m_NextScreen;
+  virtual ScreenResult GetResult() = 0;
 };
 
 }
