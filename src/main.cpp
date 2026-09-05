@@ -10,6 +10,10 @@
 
 using namespace ftxui;
 
+void packetCallback(u_char* args, const struct pcap_pkthdr* pHeader, const u_char* packet) {
+  std::cout << "Packet length grabbed: " << pHeader->len << std::endl;
+}
+
 int main([[maybe_unused]]int argc, [[maybe_unused]]char* argv[]) {
 
   const auto devices {PA::Core::ListDevices()};
@@ -29,6 +33,11 @@ int main([[maybe_unused]]int argc, [[maybe_unused]]char* argv[]) {
   }
 
   std::cout << "Capturing on: " << selection->DeviceName << '\n';
+
+  auto pHandle {PA::Core::LiveCapture(selection->DeviceName.c_str())};
+  pcap_loop(pHandle, 10, packetCallback, nullptr);
+
+  pcap_close(pHandle);
 
   return 0;
 }

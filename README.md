@@ -32,3 +32,13 @@ make
 # Debug symbol build
 make debug
 ```
+
+# Running
+Note since you're using what is likely privileged operations for your device 
+interfaces, you'll likely need to grant you'll need to setup a program rule
+for it via whatever method you prefer.
+
+I'm fairly lazy so I just:
+```bash
+sudo ./packet-analyzer
+```

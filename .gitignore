@@ -21,7 +21,8 @@
 *.gcda
 *.gcov
 perf.data*
-core
+/core
+/core.[0-9]*
 vgcore.*
 
 # Packet captures
