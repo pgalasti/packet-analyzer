@@ -1,14 +1,15 @@
 TARGET    := packet-analyzer
 SRC_DIR   := src
+INC_DIR   := include
 BUILD_DIR := build
 BIN_DIR   := bin
 
 CXX      ?= g++
 CXXSTD   := -std=c++23
 WARNINGS := -Wall -Wextra -Wpedantic
-CPPFLAGS += -I$(SRC_DIR) -MMD -MP
+CPPFLAGS += -I$(SRC_DIR) -I$(INC_DIR) -MMD -MP
 CXXFLAGS += $(CXXSTD) $(WARNINGS)
-LDLIBS   += -lpcap
+LDLIBS   += -lpcap -lftxui-component -lftxui-dom -lftxui-screen
 
 BUILD ?= release
 ifeq ($(BUILD),debug)

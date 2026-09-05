@@ -4,8 +4,12 @@
 #include <cstring>
 #include <stdexcept>
 #include <iomanip>
+#include <algorithm>
 
 #include <pcap.h>
+
+#include "stdftxui.h"
+#include <ftxui/screen/terminal.hpp>
 
 constexpr int LOOKUP_OP_FAILURE {-1};
 
@@ -16,17 +20,23 @@ struct ActiveDevice {
 };
 
 std::vector<ActiveDevice> ListDevices(); 
+ftxui::Element GenerateUIElements(const std::vector<ActiveDevice>&);
+
+
+using namespace ftxui;
 
 int main([[maybe_unused]]int argc, [[maybe_unused]]char* argv[]) {
 
   auto devices {ListDevices()};
+  
+  auto document = GenerateUIElements(devices);
 
-  for(auto device : devices) {
-    std::cout << std::left << std::setw(20) 
-      << device.DeviceName << std::setw(10)
-      << " - " << std::left << std::setw(30) 
-      << device.Description << std::endl;
-  }
+  document->ComputeRequirement();
+  const auto required = document->requirement();
+  auto screen = Screen(std::max(required.min_x, Terminal::Size().dimx),
+                       required.min_y);
+  Render(screen, document);
+  screen.Print();
 
   return 0;
 
@@ -70,3 +80,24 @@ std::vector<ActiveDevice> ListDevices() {
 
   return devices; 
 }
+
+ftxui::Element GenerateUIElements(const std::vector<ActiveDevice>& devices) {
+  std::vector<Element> deviceRows;
+  deviceRows.reserve(devices.size());
+
+  std::transform(devices.begin(), devices.end(), std::back_inserter(deviceRows),
+		[](const ActiveDevice& device) {
+                  return hbox({
+                    text(device.DeviceName) | border | color(Color::Green) | size(WIDTH, EQUAL, 30),
+		    text(device.Description) | border | flex
+		  });
+		});
+  return vbox({
+    hbox({
+      text("Device Interface") | border | color(Color::Green) | bold | size(WIDTH, EQUAL, 30),
+      text("Description") | border | color(Color::CyanLight) | bold | flex,
+    }),
+    vbox(std::move(deviceRows))
+  });
+}
+
