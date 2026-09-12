@@ -12,16 +12,26 @@ A console based packet analyzer.
 ### Prereqs
 I'm trying out [FTXUI](https://github.com/ArthurSonzogni/FTXUI) for some cool UI stuff and libpcap for network capture.
 
-I decided to go with [PcapPlusPlus](https://github.com/seladb/PcapPlusPlus) to not re-re-re-invent the steering wheel of parsing different network packet types.
+I decided to go with [PcapPlusPlus](https://github.com/seladb/PcapPlusPlus) to not re-invent the steering wheel of parsing different network packet types.
+I added it as a submodule so be sure to fetch submodules before you attempt to build:
+```bash
+git clone --recurse-submodules https://github.com/pgalasti/packet-analyzer.git
+
+# If you already cloned
+git submodule update --init --recursive
+```
+
+`make` builds the submodule for you (static, into `third_party/install`), so
+CMake is needed but PcapPlusPlus itself does not have to be installed.
 
 ```bash
 # Debian apt
-sudo apt install libftxui-dev libpcap-dev libpcapplusplus-dev libpcap-dev
+sudo apt install libftxui-dev libpcap-dev cmake
 ```
 
 ```bash
 # Mac via Homebrew
-brew install ftxui libpcap pcapplusplus
+brew install ftxui libpcap cmake
 ```
 
 ### Make
@@ -33,6 +43,12 @@ make
 
 # Debug symbol build
 make debug
+
+# Clean build
+make clean
+
+# Clean everything
+make distclean
 ```
 
 # Running
