@@ -17,12 +17,12 @@ struct ActiveDeviceSelect {
 using ActiveDeviceSelects = std::vector<ActiveDeviceSelect>; 
 using SelectedDevice = std::optional<ActiveDeviceSelect>;
 
-using Base = Screen<ActiveDeviceSelects, SelectedDevice>;
+using DeviceSelectBase = Screen<ActiveDeviceSelects, SelectedDevice>;
 
 class DeviceSelectScreen : public Screen<ActiveDeviceSelects, SelectedDevice> {
 public:
   DeviceSelectScreen(const ActiveDeviceSelects& activeDevices)
-    : Base(activeDevices), m_ActiveDeviceSelects{activeDevices} {}
+    : DeviceSelectBase(activeDevices), m_ActiveDeviceSelects{activeDevices} {}
   ~DeviceSelectScreen() = default;
 
   void Render() override;

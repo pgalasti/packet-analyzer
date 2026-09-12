@@ -1,9 +1,12 @@
 #ifndef PA_STATS_H
 #define PA_STATS_H
 
+#include <cstddef>
+#include <string>
+
 namespace PA::Core {
 
-PacketStats {
+struct PacketStats {
 
   std::string Address {""};
   size_t Packets {0uz};

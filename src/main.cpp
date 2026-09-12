@@ -3,6 +3,7 @@
 
 #include "core/Device.h"
 #include "ui/DeviceSelect.h"
+#include "ui/DeviceLanding.h"
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -117,12 +118,12 @@ int main([[maybe_unused]]int argc, [[maybe_unused]]char* argv[]) {
     return 1;
   }
 
-  std::cout << "Capturing on: " << selection->DeviceName << '\n';
+  FILE_TRACE_LOG("Selected device: " << selection->DeviceName);
 
-  auto pHandle {PA::Core::LiveCapture(selection->DeviceName.c_str())};
-  pcap_loop(pHandle, 0, packetCallback, nullptr);
-
-  pcap_close(pHandle);
+  // Implement live capturing to it next
+  PA::UI::DeviceLandingScreen landingScreen(selection->DeviceName);
+  landingScreen.Init();
+  landingScreen.Render();
 
   return 0;
 }
