@@ -12,14 +12,16 @@ A console based packet analyzer.
 ### Prereqs
 I'm trying out [FTXUI](https://github.com/ArthurSonzogni/FTXUI) for some cool UI stuff and libpcap for network capture.
 
+I decided to go with [PcapPlusPlus](https://github.com/seladb/PcapPlusPlus) to not re-re-re-invent the steering wheel of parsing different network packet types.
+
 ```bash
 # Debian apt
-sudo apt install libftxui-dev libpcap-dev
+sudo apt install libftxui-dev libpcap-dev libpcapplusplus-dev libpcap-dev
 ```
 
 ```bash
 # Mac via Homebrew
-brew install ftxui libpcap
+brew install ftxui libpcap pcapplusplus
 ```
 
 ### Make
@@ -35,8 +37,7 @@ make debug
 
 # Running
 Note since you're using what is likely privileged operations for your device 
-interfaces, you'll likely need to grant you'll need to setup a program rule
-for it via whatever method you prefer.
+interfaces, you'll likely need to setup a program rule for it via whatever method you prefer.
 
 I'm fairly lazy so I just:
 ```bash
