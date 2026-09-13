@@ -4,6 +4,7 @@
 #include "Defines.h"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <deque>
 #include <format>
@@ -270,8 +271,9 @@ void DeviceLandingScreen::Render() {
     return false;
   });
 
-  std::jthread refresher {[this, &screen](std::stop_token stopToken) {
-    while(!stopToken.stop_requested()) {
+  std::atomic<bool> refreshing {true};
+  std::thread refresher {[this, &screen, &refreshing] {
+    while(refreshing) {
       std::this_thread::sleep_for(REFRESH_INTERVAL);
       if(TakeDirty()) {
         screen.PostEvent(Event::Custom);
@@ -281,6 +283,9 @@ void DeviceLandingScreen::Render() {
 
   screen.Clear();
   screen.Loop(renderer);
+
+  refreshing = false;
+  refresher.join();
 
   Cleanup();
 }

@@ -4,8 +4,6 @@ INC_DIR   := include
 BUILD_DIR := build
 BIN_DIR   := bin
 
-# PcapPlusPlus lives in a git submodule and is built static into a local
-# prefix, so nothing needs installing system wide.
 CMAKE         ?= cmake
 PCAPPP_DIR    := third_party/PcapPlusPlus
 PCAPPP_BUILD  := third_party/build/PcapPlusPlus
@@ -25,13 +23,20 @@ CXX      ?= g++
 CXXSTD   := -std=c++23
 WARNINGS := -Wall -Wextra -Wpedantic
 CPPFLAGS += -I$(SRC_DIR) -I$(INC_DIR) -MMD -MP
-# -isystem so their headers do not answer to our warning flags. Include them as
-# <pcapplusplus/Packet.h> -- the bare name collides with our own core/Packet.h.
 CPPFLAGS += -isystem $(PCAPPP_PREFIX)/include
 CXXFLAGS += $(CXXSTD) $(WARNINGS)
-# Static archives resolve left to right, so Pcap++ must precede what it needs.
 LDLIBS   += -L$(PCAPPP_PREFIX)/lib -lPcap++ -lPacket++ -lCommon++
 LDLIBS   += -lpcap -lpthread -lftxui-component -lftxui-dom -lftxui-screen
+
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+BREW_PREFIX := $(shell brew --prefix 2>/dev/null)
+ifneq ($(BREW_PREFIX),)
+CPPFLAGS += -isystem $(BREW_PREFIX)/include
+LDFLAGS  += -L$(BREW_PREFIX)/lib
+endif
+LDLIBS   += -framework CoreFoundation -framework SystemConfiguration
+endif
 
 BUILD ?= release
 ifeq ($(BUILD),debug)
