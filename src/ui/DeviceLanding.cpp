@@ -4,8 +4,12 @@
 #include "Defines.h"
 
 #include <algorithm>
+#include <chrono>
+#include <deque>
 #include <format>
 #include <string>
+#include <thread>
+#include <utility>
 #include <vector>
 
 using namespace PA::UI;
@@ -16,52 +20,40 @@ namespace {
 constexpr int LIST_PANE_HEIGHT {12};
 constexpr int DEVICE_NAME_WIDTH {28};
 
-// Dummy code until I implement pcap
-PA::Core::PacketRecord MakeDummyPacket(std::uint64_t index, PA::Core::Direction direction) {
-  static const std::vector<std::string> protocols {"TCP", "UDP", "ICMP", "ARP", "TCP", "UDP"};
-  static const std::vector<std::string> locals {
-    "192.168.1.24:52344", "192.168.1.24:443", "192.168.1.24:8080", "192.168.1.24:22"};
-  static const std::vector<std::string> remotes {
-    "142.250.72.14:443", "10.0.0.5:53", "93.184.216.34:80", "172.217.12.238:443"};
-
-  const auto slot {static_cast<std::size_t>(index)};
-  const bool inbound {direction == PA::Core::Direction::Received};
-
-  PA::Core::PacketRecord record;
-  record.Index = index;
-  record.Timestamp = 1757700000.0 + static_cast<double>(index) * 0.137;
-  record.Protocol = protocols.at(slot % protocols.size());
-  record.Source = inbound ? remotes.at(slot % remotes.size()) : locals.at(slot % locals.size());
-  record.Destination = inbound ? locals.at(slot % locals.size()) : remotes.at(slot % remotes.size());
-  record.WireLength = 64uz + (slot * 37uz) % 1450uz;
-
-  const std::vector<std::uint8_t> preamble {
-    0x00, 0x1a, 0x2b, 0x3c, 0x4d, 0x5e, 0xa4, 0x83, 0xe7, 0x11, 0x22, 0x33, 0x08, 0x00,
-    0x45, 0x00, 0x00, 0x3c, 0x1c, 0x46, 0x40, 0x00, 0x40, 0x06, 0xb1, 0xe6,
-    0xc0, 0xa8, 0x01, 0x18, 0x8e, 0xfa, 0x48, 0x0e};
-  record.Bytes = preamble;
-
-  const std::string payload {
-    std::format("GET /index.html?seq={} HTTP/1.1\r\nHost: example.com\r\n"
-                "User-Agent: packet-analyzer/0.1\r\nAccept: */*\r\n\r\n", index)};
-  record.Bytes.insert(record.Bytes.end(), payload.begin(), payload.end());
-
-  for(std::size_t filler {0uz}; filler < (slot % 5uz) * 16uz; ++filler) {
-    record.Bytes.push_back(static_cast<std::uint8_t>((filler * 17uz + slot) & 0xffuz));
-  }
-
-  return record;
-}
+constexpr auto REFRESH_INTERVAL {std::chrono::milliseconds{100}};
 
 std::string FormatLabel(const PA::Core::PacketRecord& record) {
-  return std::format("{:>5}  {:<4}  {:<21} -> {:<21} {:>5}B",
+  return std::format("{:>5}  {:<6}  {:<21} -> {:<21} {:>5}B",
     record.Index, record.Protocol, record.Source, record.Destination, record.WireLength);
 }
 
-MenuOption PacketMenuOption(std::vector<std::string>* pEntries, int* pSelected) {
+void AbsorbRecords(PA::Core::PacketHistory& history, std::deque<PA::Core::PacketRecord> records,
+                   int& selected, int& focused) {
+  if(records.empty()) {
+    return;
+  }
+
+  const auto previousSize {static_cast<int>(history.Size())};
+  const bool following {selected >= previousSize - 1};
+
+  std::size_t evicted {0uz};
+  for(auto& record : records) {
+    if(history.Size() == history.Capacity()) {
+      ++evicted;
+    }
+    history.Push(std::move(record));
+  }
+
+  const auto lastIndex {static_cast<int>(history.Size()) - 1};
+  selected = following ? lastIndex : std::clamp(selected - static_cast<int>(evicted), 0, lastIndex);
+  focused = selected;
+}
+
+MenuOption PacketMenuOption(std::vector<std::string>* pEntries, int* pSelected, int* pFocused) {
   auto option {MenuOption::Vertical()};
   option.entries = pEntries;
   option.selected = pSelected;
+  option.focused_entry = pFocused;
   option.entries_option.transform = [](const EntryState& state) {
     auto row {hbox({text(state.active ? ">" : " "), text(state.label) | flex})};
     if(state.active && state.focused) {
@@ -92,28 +84,11 @@ Element DumpPane(const std::vector<std::string>& lines, Color tone) {
 
 void DeviceLandingScreen::Init() {
   FILE_TRACE_LOG("DeviceLanding:: Init for device " << m_DeviceName);
-
-  const std::lock_guard lock {m_Mutex};
-
-  for(std::uint64_t index {1u}; index <= 60u; ++index) {
-    auto received {MakeDummyPacket(index, PA::Core::Direction::Received)};
-    m_ReceivedBytes += received.WireLength;
-    ++m_ReceivedCount;
-    m_Received.Push(std::move(received));
-
-    auto sent {MakeDummyPacket(index, PA::Core::Direction::Sent)};
-    m_SentBytes += sent.WireLength;
-    ++m_SentCount;
-    m_Sent.Push(std::move(sent));
-  }
-
   SyncLabels();
 }
 
 void DeviceLandingScreen::Cleanup() {
   FILE_TRACE_LOG("DeviceLanding:: Cleanup.");
-  const std::lock_guard lock {m_Mutex};
-  m_pScreen = nullptr;
 }
 
 bool DeviceLandingScreen::AnalyzeEnabled() const {
@@ -122,28 +97,42 @@ bool DeviceLandingScreen::AnalyzeEnabled() const {
 }
 
 void DeviceLandingScreen::Record(PA::Core::Direction direction, PA::Core::PacketRecord record) {
-  ScreenInteractive* pScreen {nullptr};
+  const std::lock_guard lock {m_Mutex};
+  m_Dirty = true;
 
+  if(direction == PA::Core::Direction::Received) {
+    m_Totals.ReceivedBytes += record.WireLength;
+    ++m_Totals.ReceivedCount;
+    if(m_Analyze) {
+      m_PendingReceived.Push(std::move(record));
+    }
+  } else {
+    m_Totals.SentBytes += record.WireLength;
+    ++m_Totals.SentCount;
+    if(m_Analyze) {
+      m_PendingSent.Push(std::move(record));
+    }
+  }
+}
+
+bool DeviceLandingScreen::TakeDirty() {
+  const std::lock_guard lock {m_Mutex};
+  return std::exchange(m_Dirty, false);
+}
+
+void DeviceLandingScreen::DrainPending() {
+  std::deque<PA::Core::PacketRecord> received;
+  std::deque<PA::Core::PacketRecord> sent;
   {
     const std::lock_guard lock {m_Mutex};
-
-    if(direction == PA::Core::Direction::Received) {
-      m_ReceivedBytes += record.WireLength;
-      ++m_ReceivedCount;
-      m_Received.Push(std::move(record));
-    } else {
-      m_SentBytes += record.WireLength;
-      ++m_SentCount;
-      m_Sent.Push(std::move(record));
-    }
-
-    SyncLabels();
-    pScreen = m_pScreen;
+    received = m_PendingReceived.Release();
+    sent = m_PendingSent.Release();
+    m_ShownTotals = m_Totals;
   }
 
-  if(pScreen != nullptr) {
-    pScreen->PostEvent(Event::Custom);
-  }
+  AbsorbRecords(m_Received, std::move(received), m_ReceivedSelected, m_ReceivedFocused);
+  AbsorbRecords(m_Sent, std::move(sent), m_SentSelected, m_SentFocused);
+  SyncLabels();
 }
 
 void DeviceLandingScreen::SyncLabels() {
@@ -158,32 +147,26 @@ void DeviceLandingScreen::SyncLabels() {
   for(const auto& record : m_Sent) {
     m_SentLabels.push_back(FormatLabel(record));
   }
-
-  m_ReceivedSelected = std::clamp(m_ReceivedSelected, 0,
-    std::max(0, static_cast<int>(m_ReceivedLabels.size()) - 1));
-  m_SentSelected = std::clamp(m_SentSelected, 0,
-    std::max(0, static_cast<int>(m_SentLabels.size()) - 1));
 }
 
 void DeviceLandingScreen::Render() {
   FILE_TRACE_LOG("DeviceLanding:: Rendering landing screen.");
 
   auto screen {ScreenInteractive::Fullscreen()};
-  {
-    const std::lock_guard lock {m_Mutex};
-    m_pScreen = &screen;
-  }
 
-  auto analyzeCheckbox {Checkbox("Analyze", &m_Analyze)};
-  auto receivedMenu {Menu(PacketMenuOption(&m_ReceivedLabels, &m_ReceivedSelected))};
-  auto sentMenu {Menu(PacketMenuOption(&m_SentLabels, &m_SentSelected))};
+  auto checkboxOption {CheckboxOption::Simple()};
+  checkboxOption.on_change = [this] {
+    const std::lock_guard lock {m_Mutex};
+    m_Analyze = m_AnalyzeChecked;
+  };
+  auto analyzeCheckbox {Checkbox("Analyze", &m_AnalyzeChecked, checkboxOption)};
+  auto receivedMenu {Menu(PacketMenuOption(&m_ReceivedLabels, &m_ReceivedSelected, &m_ReceivedFocused))};
+  auto sentMenu {Menu(PacketMenuOption(&m_SentLabels, &m_SentSelected, &m_SentFocused))};
 
   auto lists {Container::Horizontal({receivedMenu, sentMenu})};
   auto layout {Container::Vertical({analyzeCheckbox, lists})};
 
   auto renderer {Renderer(layout, [&] {
-    const std::lock_guard lock {m_Mutex};
-
     const bool sentFocused {sentMenu->Focused()};
     const auto& history {sentFocused ? m_Sent : m_Received};
     const auto selected {static_cast<std::size_t>(sentFocused ? m_SentSelected : m_ReceivedSelected)};
@@ -210,10 +193,12 @@ void DeviceLandingScreen::Render() {
     })};
 
     auto totals {hbox({
-      text(std::format(" Total Packets Received/Sent: {}/{} ", m_ReceivedCount, m_SentCount))
+      text(std::format(" Total Packets Received/Sent: {}/{} ",
+        m_ShownTotals.ReceivedCount, m_ShownTotals.SentCount))
         | center | flex,
       separator(),
-      text(std::format(" Total Packets Received/Sent (bytes): {}/{} ", m_ReceivedBytes, m_SentBytes))
+      text(std::format(" Total Packets Received/Sent (bytes): {}/{} ",
+        m_ShownTotals.ReceivedBytes, m_ShownTotals.SentBytes))
         | center | flex,
     })};
 
@@ -272,6 +257,10 @@ void DeviceLandingScreen::Render() {
   })};
 
   renderer |= CatchEvent([&](Event event) {
+    if(event == Event::Custom) {
+      DrainPending();
+      return true;
+    }
     if(event == Event::Character('q') || event == Event::Escape) {
       FILE_TRACE_LOG("DeviceLanding:: Quitting.");
       m_Result = m_DeviceName;
@@ -280,6 +269,15 @@ void DeviceLandingScreen::Render() {
     }
     return false;
   });
+
+  std::jthread refresher {[this, &screen](std::stop_token stopToken) {
+    while(!stopToken.stop_requested()) {
+      std::this_thread::sleep_for(REFRESH_INTERVAL);
+      if(TakeDirty()) {
+        screen.PostEvent(Event::Custom);
+      }
+    }
+  }};
 
   screen.Clear();
   screen.Loop(renderer);

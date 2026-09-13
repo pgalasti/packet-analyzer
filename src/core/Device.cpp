@@ -46,23 +46,4 @@ Devices ListDevices() {
   return devices;
 }
 
-pcap_t* LiveCapture(const char* pszDevice) {
-#ifndef NDEBUG
-  std::cout << "Attempting to live caputre for device:" << pszDevice << "..." << std::endl;
-#endif
-
-  char szErrorBuffer[PCAP_ERRBUF_SIZE];
-  pcap_t* pHandle {pcap_open_live(pszDevice, PCAP_LISTEN_BUF_SIZE, 1, 1000, szErrorBuffer)};
-  if(pHandle == nullptr) {
-    throw std::runtime_error(std::string("Unable to open device ") + pszDevice
-      + " for live capture: " + szErrorBuffer);
-  }
-
-#ifndef NDEBUG
-  std::cout << "Live capture for " << pszDevice << " is open" << std::endl;
-#endif
-  return pHandle;
-}
-
-
 }
