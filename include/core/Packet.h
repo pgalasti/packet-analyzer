@@ -6,6 +6,7 @@
 #include <deque>
 #include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace PA::Core {
@@ -39,6 +40,8 @@ public:
   }
 
   void Clear() { m_Records.clear(); }
+
+  std::deque<PacketRecord> Release() { return std::exchange(m_Records, {}); }
 
   std::size_t Capacity() const noexcept { return m_Capacity; }
   std::size_t Size() const noexcept { return m_Records.size(); }
